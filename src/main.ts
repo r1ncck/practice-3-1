@@ -5,17 +5,19 @@ import { createBookFromForm } from './task4-integration';
 import { sortBooks } from './task5-utils';
 //TODO 3.0: импортируйте BookCatalog из task6
 import { BookCatalog } from './task6-classes';
+import { Wishlist } from './task7-wishlist';
 
 // TODO 3.1: замените `let catalog: Catalog = {...}` на экземпляр
 // `new BookCatalog([...те же книги...], 'main')`.
 // Тип `Catalog` после замены больше не нужен — уберите импорт.
 
 
-let catalog = new BookCatalog (
-  'main',
-  [{ id: '1', title: 'TypeScript Guide', authors: ['John Doe'], year: 2024 },
-  { id: '2', title: 'JavaScript Basics', authors: ['Jane Smith'], year: 2022 }]
-);
+const initialBooks: Book [] = [
+  { id: '1', title: 'TypeScript Guide', authors: ['John Doe'], year: 2024 },
+  { id: '2', title: 'JavaScript Basics', authors: ['Jane Smith'], year: 2022 }];
+
+  let catalog = new BookCatalog ('main', initialBooks);
+  let wishlist = new Wishlist();
 
 
 // восстановление из localStorage
@@ -41,6 +43,14 @@ if (saved) {
     console.error('Ошибка парсинга каталога из localStorage')
   }
 }
+const savedWishlist = localStorage.getItem('wishlist');
+if (savedWishlist) {
+  const parseIds = JSON.parse(savedWishlist);
+  wishlist = new Wishlist (parseIds);
+}
+function saveWishlist (){
+  localStorage.setItem('wishlist', JSON.stringify(wishlist.ids));
+}
 
 
 // сохранение В localStorage
@@ -61,6 +71,42 @@ const errorMessage = document.querySelector('#errorMessage') as HTMLDivElement;
 const searchInput = document.querySelector('#searchInput') as HTMLInputElement;
 const sortBySelect = document.querySelector('#sortBy') as HTMLSelectElement;
 
+
+function createBookCard (book: Book): HTMLDivElement {
+  const card = document.createElement('div');
+  card.className = 'book-card';
+
+  const titleEl = document.createElement('h3');
+  titleEl.textContent = `${book.title} - ${book.authors.join(', ')}${book.year ? `, ${book.year}` : ''}`
+  card.append(titleEl);
+  if (book.rating !== undefined) {
+    const ratingEl = document.createElement('p');
+    ratingEl.textContent = `Рейтинг: ${book.rating}`;
+    card.append(ratingEl);
+  }
+  const deleteBtn = document.createElement('button');
+  deleteBtn.textContent = 'Удалить';
+  deleteBtn.addEventListener('click', () => {
+    catalog.removeBook(book.id);
+    saveCatalog();
+    renderBooks(catalog.getBooks());
+    if (typeof renderWishlist === 'function') renderWishlist();
+  });
+  card.append(deleteBtn);
+  const favBtn = document.createElement('button');
+  favBtn.textContent = wishlist.has(book.id) ? '❤️ В избранном' : '🤍 В избранное';
+
+  favBtn.addEventListener('click', () => {
+    wishlist.toggle(book.id);
+    saveWishlist();
+
+    renderBooks(catalog.getBooks());
+    if (typeof renderWishlist === 'function') renderWishlist();
+  });
+  card.append(favBtn);
+  return card;
+}
+
 // отрисовка
 function renderBooks(books: Book[]) {
   bookList.innerHTML = '';
@@ -70,33 +116,25 @@ function renderBooks(books: Book[]) {
   }
 
   books.forEach(book => {
-    const card = document.createElement('div');
-    card.className = 'book-card';
+    bookList.append(createBookCard(book));
+  });
+}
 
-    const titleEl = document.createElement('h3');
-    titleEl.textContent = `${book.title} — ${book.authors.join(', ')}${book.year ? `, ${book.year}` : ''}`;
-    card.append(titleEl);
+function renderWishlist() {
+  const container = document.querySelector('#wishlistContainer') as HTMLDivElement;
+  if (!container) return;
 
-    if (book.rating !== undefined) {
-      const ratingEl = document.createElement('p');
-      ratingEl.textContent = `Рейтинг: ${book.rating}`;
-      card.append(ratingEl);
-    }
+  container.innerHTML = '';
 
-    const deleteBtn = document.createElement('button');
-    deleteBtn.textContent = 'Удалить';
-    deleteBtn.addEventListener('click', () => {
+  const favBooks = wishlist.getFavorites(catalog);
 
-      // TODO 3.3: замените функциональный removeBook на метод класса.      
-      catalog.removeBook(book.id)
-      saveCatalog();
-      // TODO 3.4: замените вызов Object.values(catalog) на метод каталога.
-      // Таких мест, где вызывается Object.values(catalog), в файле несколько — найдите все.
-      renderBooks(Object.values(catalog));
-    });
-    card.append(deleteBtn);
+  if (favBooks.length === 0) {
+    container.textContent = 'Пока ничего не добавлено';
+    return;
+  }
 
-    bookList.append(card);
+  favBooks.forEach(book => {
+    container.append(createBookCard(book));
   });
 }
 
@@ -117,7 +155,8 @@ form.addEventListener('submit', (e) => {
     saveCatalog();
     form.reset();
 
-    renderBooks(Object.values(catalog));
+    renderBooks(catalog.getBooks());
+    renderWishlist();
   } catch (error) {
     if (error instanceof Error) {
       errorMessage.textContent = error.message;
