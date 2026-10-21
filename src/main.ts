@@ -140,6 +140,7 @@ function renderWishlist() {
 
 // Первичная отрисовка
 renderBooks(catalog.getBooks());
+renderWishlist();
 
 // обработчик формы
 form.addEventListener('submit', (e) => {
